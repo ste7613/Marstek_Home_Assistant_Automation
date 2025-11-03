@@ -1,0 +1,123 @@
+- id: '668'
+  alias: "Marstek Venus Automation"
+  description: "Marstek Venus Automation with PV and BEV"
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.stabil_zu_viel_einspeisung
+        - binary_sensor.stabil_zu_viel_netzbezug
+      to: 'on'
+    - platform: time_pattern
+      minutes: "/30"
+
+  action:
+    - variables:
+        p_act: "{{ states('sensor.tasmota_logarex_p_act') | float(0) }}"
+        soc: "{{ states('sensor.marstek_venus_modbus_battery_soc') | float(0) }}"
+        cur_charge: "{{ states('number.marstek_venus_modbus_set_forcible_charge_power') | float(0) }}"
+        cur_discharge: "{{ states('number.marstek_venus_modbus_set_forcible_discharge_power') | float(0) }}"
+        current_mode: "{{ states('select.marstek_venus_modbus_force_mode') }}"
+        bev_status: "{{ states('sensor.myenergi_zappi_0815_plug_status') }}"
+        pv_act: "{{ states('sensor.pv_grid_power') | float(0) }}"
+
+        throttled_discharge_power: >
+          {% set new_discharge = cur_discharge + p_act %}
+          {{ [0, [new_discharge, 2500] | min] | max | int(0) }}
+
+        throttled_charge_power: >
+          {% set new_charge = cur_charge - p_act %}
+          {{ [0, [new_charge, 2500] | min] | max | int(0) }}
+        
+    - choose:
+        # 0. Pre-Check
+        - conditions: 
+            - condition: state
+              entity_id: switch.marstek_venus_modbus_rs485_control_mode
+              state: 'off'
+          sequence:
+            - stop: "control mode still off"
+          
+        # 1. Shutdown
+        - conditions:
+          - or:
+            - condition: template
+              value_template: "{{ current_mode == 'Discharge' and bev_status == 'Charging' }}"
+            - condition: template
+              value_template: "{{ current_mode == 'Charge' and soc > 99 }}"
+            - condition: template
+              value_template: "{{ current_mode == 'Charge' and pv_act < 100 }}"
+            - condition: template
+              value_template: "{{ current_mode == 'Charge' and throttled_charge_power == 0 }}"
+            - condition: template
+              value_template: "{{ current_mode == 'Discharge' and throttled_discharge_power == 0 }}"
+            - condition: template
+              value_template: "{{ current_mode == 'Discharge' and soc < 12 }}"
+          sequence:
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_discharge_power}
+              data: {value: 0}
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_charge_power}
+              data: {value: 0}
+            - service: select.select_option
+              target: {entity_id: select.marstek_venus_modbus_force_mode}
+              data: {option: 'None'}
+            
+        # 2. Charging
+        - conditions:
+            - condition: template
+              value_template: "{{ current_mode == 'Charge' and throttled_charge_power > 0 and pv_act >= 100 }}"
+          sequence:
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_charge_power}
+              data: {value: "{{ throttled_charge_power }}"}
+
+        # 3. Discharging
+        - conditions:
+            - condition: template
+              value_template: "{{ current_mode == 'Discharge' and throttled_discharge_power > 0 }}"
+          sequence:
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_discharge_power}
+              data: {value: "{{ throttled_discharge_power }}"}
+        
+        # 4. Start Discharging
+        - conditions:
+            - condition: template
+              value_template: "{{ current_mode != 'Charge' and current_mode != 'Discharge' and throttled_discharge_power > 0 and soc > 11 }}"
+          sequence:
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_discharge_power}
+              data: {value: "{{ throttled_discharge_power }}"}
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_charge_power}
+              data: {value: 0}
+            - service: select.select_option
+              target: {entity_id: select.marstek_venus_modbus_force_mode}
+              data: {option: 'Discharge'}
+
+        # 5. Start Charging
+        - conditions:
+            - condition: template
+              value_template: "{{ current_mode != 'Charge' and current_mode != 'Discharge'  and throttled_charge_power > 0 and pv_act >= 100 and soc < 100 }}"
+          sequence:
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_charge_power}
+              data: {value: "{{ throttled_charge_power }}"}
+            - service: number.set_value
+              target: {entity_id: number.marstek_venus_modbus_set_forcible_discharge_power}
+              data: {value: 0}
+            - service: select.select_option
+              target: {entity_id: select.marstek_venus_modbus_force_mode}
+              data: {option: 'Charge'}
+        
+        # 6. Idle
+        - conditions:
+            - condition: template
+              value_template: "{{ current_mode != 'Charge' and current_mode != 'Discharge'  and throttled_charge_power == 0 and throttled_discharge_power == 0 }}"
+          sequence: []
+
+      default:
+          sequence: []
+          
+  mode: single
