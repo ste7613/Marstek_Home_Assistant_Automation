@@ -1,0 +1,19 @@
+# ... insert in your Home Assistant configuration.yaml
+# it creates 2 new sensors, please adjust the dead zone (+/- 25 Watt)
+# and the delay (2 seconds)
+
+template:
+  - binary_sensor:
+      - name: "stabil_zu_viel_einspeisung"
+        unique_id: stabil_zu_viel_einspeisung
+        device_class: running
+        state: "{{ states('sensor.tasmota_logarex_p_act') | float(0) < -25 }}" 
+        delay_on: 
+          seconds: 2 
+
+      - name: "stabil_zu_viel_netzbezug"
+        unique_id: stabil_zu_viel_netzbezug
+        device_class: running
+        state: "{{ states('sensor.tasmota_logarex_p_act') | float(0) > 25 }}"
+        delay_on: 
+          seconds: 2
