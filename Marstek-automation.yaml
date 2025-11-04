@@ -8,7 +8,7 @@
         - binary_sensor.stabil_zu_viel_netzbezug
       to: 'on'
     - platform: time_pattern
-      minutes: "/30"
+      seconds: "/30"
 
   action:
     - variables:
