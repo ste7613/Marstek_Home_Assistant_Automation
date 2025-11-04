@@ -43,9 +43,9 @@
             - condition: template
               value_template: "{{ current_mode == 'Discharge' and bev_status == 'Charging' }}"
             - condition: template
-              value_template: "{{ current_mode == 'Charge' and soc > 99 }}"
+              value_template: "{{ current_mode == 'Charge' and soc >= 99 }}"
             - condition: template
-              value_template: "{{ current_mode == 'Charge' and pv_act < 100 }}"
+              value_template: "{{ current_mode == 'Charge' and pv_act < 200 }}"
             - condition: template
               value_template: "{{ current_mode == 'Charge' and throttled_charge_power == 0 }}"
             - condition: template
@@ -66,7 +66,7 @@
         # 2. Charging
         - conditions:
             - condition: template
-              value_template: "{{ current_mode == 'Charge' and throttled_charge_power > 0 and pv_act >= 100 }}"
+              value_template: "{{ current_mode == 'Charge' and throttled_charge_power > 0 and pv_act >= 200 }}"
           sequence:
             - service: number.set_value
               target: {entity_id: number.marstek_venus_modbus_set_forcible_charge_power}
@@ -99,7 +99,7 @@
         # 5. Start Charging
         - conditions:
             - condition: template
-              value_template: "{{ current_mode != 'Charge' and current_mode != 'Discharge'  and throttled_charge_power > 0 and pv_act >= 100 and soc < 100 }}"
+              value_template: "{{ current_mode != 'Charge' and current_mode != 'Discharge'  and throttled_charge_power > 0 and pv_act >= 200 and soc < 99 }}"
           sequence:
             - service: number.set_value
               target: {entity_id: number.marstek_venus_modbus_set_forcible_charge_power}
