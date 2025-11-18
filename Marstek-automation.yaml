@@ -61,7 +61,7 @@
               data: {value: 0}
             - service: select.select_option
               target: {entity_id: select.marstek_venus_modbus_force_mode}
-              data: {option: 'None'}
+              data: {option: 'Standby'}
             
         # 2. Charging
         - conditions:
