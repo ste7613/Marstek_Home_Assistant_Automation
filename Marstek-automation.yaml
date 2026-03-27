@@ -2,13 +2,13 @@
   alias: "Marstek Venus Automation"
   description: "Marstek Venus Automation with PV and BEV"
   trigger:
-    - platform: state
-      entity_id:
-        - binary_sensor.stabil_zu_viel_einspeisung
-        - binary_sensor.stabil_zu_viel_netzbezug
-      to: 'on'
+    #- platform: state
+    #  entity_id:
+    #    - binary_sensor.stabil_zu_viel_einspeisung
+    #    - binary_sensor.stabil_zu_viel_netzbezug
+    #  to: 'on'
     - platform: time_pattern
-      seconds: "/30"
+      seconds: "/10"
 
   action:
     - variables:
@@ -61,7 +61,7 @@
               data: {value: 0}
             - service: select.select_option
               target: {entity_id: select.marstek_venus_modbus_force_mode}
-              data: {option: 'standby'}
+              data: {option: 'stop'}
             
         # 2. Charging
         - conditions:
